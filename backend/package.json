@@ -1,0 +1,35 @@
+{
+  "name": "brotherscloud-backend",
+  "version": "1.0.0",
+  "description": "Backend for BrothersCloud — Family Cloud Storage",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "brotherscloud",
+    "family",
+    "cloud",
+    "storage",
+    "nodejs",
+    "express",
+    "mysql"
+  ],
+  "author": "Mohammed Aminu Shehe",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.3",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
