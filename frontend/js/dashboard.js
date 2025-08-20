@@ -169,7 +169,6 @@ class Dashboard {
           const eventDate = new Date(ev.event_date);
           const diffDays = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
 
-          // 3-day pre-event notification
           if (diffDays === 3 && !ev.notified_before) {
             new Notification(`Upcoming Event: ${ev.event_name}`, {
               body: `Event in 3 days: ${ev.event_description || 'No description'}`
@@ -181,15 +180,13 @@ class Dashboard {
                 headers: { Authorization: `Bearer ${this.token}` }
               });
               ev.notified_before = true;
-            } catch(err) {
-              console.error('Notify-before patch error:', err);
-            }
+            } catch(err) { console.error('Notify-before patch error:', err); }
           }
         });
       };
 
       checkNotifications();
-      setInterval(checkNotifications, 3600000); // check every hour
+      setInterval(checkNotifications, 3600000);
     });
   }
 
@@ -314,9 +311,8 @@ class Dashboard {
     const modal = document.createElement('div');
     modal.className = 'modal';
 
-    let bodyContent = '';
     const ext = name.split('.').pop().toLowerCase();
-
+    let bodyContent = '';
     if (type === 'image') bodyContent = `<img src="${url}" alt="${name}">`;
     else if (type === 'video') bodyContent = `<video src="${url}" controls autoplay></video>`;
     else if (ext === 'pdf') bodyContent = `<iframe src="${url}" frameborder="0"></iframe>`;
@@ -374,4 +370,6 @@ class Dashboard {
 /* ===========================
    Initialize Dashboard
 =========================== */
-document.addEventListener("DOMContentLoaded", () => new Dashboard());
+document.addEventListener("DOMContentLoaded", () => {
+  new Dashboard();
+});

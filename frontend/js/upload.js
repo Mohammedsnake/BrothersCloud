@@ -1,3 +1,8 @@
+/* ============================
+   Upload Page JS
+============================ */
+
+// DOM Elements
 const uploadType = document.getElementById('uploadType');
 const fileGroup = document.querySelector('.file-group');
 const fileInput = document.getElementById('fileInput');
@@ -7,14 +12,16 @@ const uploadForm = document.getElementById('uploadForm');
 const messageDiv = document.getElementById('message');
 const eventsList = document.getElementById('eventsList'); // container for events
 
-// Allowed extensions for file uploads
+// Allowed file extensions
 const allowedExtensions = {
   image: ['jpg','jpeg','png','gif','webp'],
   document: ['pdf','doc','docx'],
   video: ['mp4','mkv','avi','webm']
 };
 
-// Show/hide fields based on selected type
+/* ============================
+   SHOW/HIDE INPUT FIELDS
+============================ */
 uploadType.addEventListener('change', () => {
   const type = uploadType.value;
   if (type === 'event') {
@@ -29,12 +36,16 @@ uploadType.addEventListener('change', () => {
   }
 });
 
-// Navigate back to dashboard
+/* ============================
+   NAVIGATION
+============================ */
 backBtn.addEventListener('click', () => {
   window.location.href = 'dashboard.html';
 });
 
-// Fetch and display all events for the logged-in user
+/* ============================
+   LOAD USER EVENTS
+============================ */
 async function loadEvents() {
   const token = localStorage.getItem('token');
   const userId = localStorage.getItem('user_id');
@@ -71,10 +82,25 @@ async function loadEvents() {
   }
 }
 
-// Initial load of events
-document.addEventListener('DOMContentLoaded', loadEvents);
+/* ============================
+   INITIALIZATION
+============================ */
+document.addEventListener('DOMContentLoaded', () => {
+  loadEvents();      // Load user events
 
-// Handle upload form submission
+  // Initialize Flatpickr for event date
+  flatpickr("#eventDate", {
+    dateFormat: "Y-m-d",
+    altInput: true,
+    altFormat: "F j, Y",
+    minDate: "today",
+    allowInput: true
+  });
+});
+
+/* ============================
+   UPLOAD FORM SUBMISSION
+============================ */
 uploadForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   messageDiv.textContent = '';
@@ -135,7 +161,6 @@ uploadForm.addEventListener('submit', async (e) => {
         return;
       }
 
-      // Use FormData to handle file upload correctly
       const formData = new FormData();
       formData.append('user_id', userId);
       formData.append('file_type', type);
@@ -145,10 +170,7 @@ uploadForm.addEventListener('submit', async (e) => {
 
       res = await fetch('http://localhost:5000/api/files', {
         method: 'POST',
-        headers: { 
-          'Authorization': 'Bearer ' + token 
-          // DO NOT set 'Content-Type' manually when sending FormData
-        },
+        headers: { 'Authorization': 'Bearer ' + token },
         body: formData
       });
     }
@@ -160,8 +182,7 @@ uploadForm.addEventListener('submit', async (e) => {
       uploadForm.reset();
       fileGroup.style.display = 'block';
       eventGroup.style.display = 'none';
-
-      if (type === 'event') loadEvents(); // Reload events list after adding
+      if (type === 'event') loadEvents(); // Refresh events
     } else {
       messageDiv.textContent = data.message || 'Upload failed';
     }
