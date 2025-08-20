@@ -1,0 +1,48 @@
+# ===========================
+# Node.js / Backend
+# ===========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.env
+
+# ===========================
+# Uploads / Generated Files
+# ===========================
+backend/uploads/
+frontend/assets/*.jpg
+frontend/assets/*.png
+frontend/assets/*.gif
+frontend/assets/*.svg
+
+# ===========================
+# Logs & OS Files
+# ===========================
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# ===========================
+# IDE / Editor
+# ===========================
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# ===========================
+# Build / Dist folders
+# ===========================
+dist/
+build/
+*.bundle.js
+
+# ===========================
+# Misc
+# ===========================
+*.bak
+*.tmp
