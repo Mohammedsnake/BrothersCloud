@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://brotherscloud-1.onrender.com/api";
 
 /* ===========================
    Utility Functions
@@ -213,7 +213,7 @@ class Dashboard {
     return `
       <div class="file-grid">
         ${files.map(file => {
-          const filePath = `http://localhost:5000${file.file_path}`;
+          const filePath = `https://brotherscloud-1.onrender.com${file.file_path}`;
           const ext = (file.file_name || 'unknown').split('.').pop().toLowerCase();
           let normalizedType = (file.file_type || 'document').toLowerCase();
 

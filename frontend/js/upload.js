@@ -56,7 +56,7 @@ async function loadEvents() {
   }
 
   try {
-    const res = await fetch(`http://localhost:5000/api/events?user_id=${userId}`, {
+    const res = await fetch(`https://brotherscloud-1.onrender.com/api/events?user_id=${userId}`, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const data = await res.json();
@@ -133,7 +133,7 @@ uploadForm.addEventListener('submit', async (e) => {
         return;
       }
 
-      res = await fetch('http://localhost:5000/api/events', {
+      res = await fetch('https://brotherscloud-1.onrender.com/api/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ uploadForm.addEventListener('submit', async (e) => {
       formData.append('file_description', itemDesc);
       formData.append('file', file);
 
-      res = await fetch('http://localhost:5000/api/files', {
+      res = await fetch('https://brotherscloud-1.onrender.com/api/files', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token },
         body: formData
