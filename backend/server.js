@@ -11,6 +11,8 @@ const authRoutes = require('./routes/authRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const cron = require("node-cron");
+const checkEventsAndNotify = require("./utils/notifier");
 
 const app = express();
 
@@ -54,6 +56,12 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
+});
+
+// run every day at 9 AM
+cron.schedule("0 0 * * *", () => {
+  console.log("⏰ Running daily event notifier...");
+  checkEventsAndNotify();
 });
 
 require('./jobs/eventEmailNotifier'); // Start the email notifier job

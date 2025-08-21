@@ -2,13 +2,13 @@ const db = require('../config/db');
 
 class EventModel {
   static async create({ user_id, event_date, event_name, event_description, repetition }) {
-    const [result] = await db.query(
-      `INSERT INTO events (user_id, event_date, event_name, event_description, repetition)
-       VALUES (?, ?, ?, ?, ?)`,
-      [user_id, event_date, event_name, event_description || null, repetition || 'once']
-    );
-    return result.insertId;
-  }
+  const [result] = await db.query(
+    `INSERT INTO events (user_id, event_date, event_name, event_description, repetition, notified_before_day, notified_on_day)
+     VALUES (?, ?, ?, ?, ?, NULL, NULL)`,
+    [user_id, event_date, event_name, event_description || null, repetition || 'once']
+  );
+  return result.insertId;
+}
 
   static async getAll({ from, to, q, user_id }) {
     const clauses = [];
