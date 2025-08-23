@@ -2,7 +2,6 @@
 const FileModel = require('../models/fileModel');
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
-const path = require('path');
 
 // 🔹 Cloudinary Config (uses environment variables)
 cloudinary.config({
@@ -47,8 +46,8 @@ exports.uploadFile = async (req, res) => {
         resource_type: 'auto', // auto-detect type
       });
 
-      file_url = uploadResult.secure_url;
-      public_id = uploadResult.public_id;
+      file_url = uploadResult.secure_url; // ✅ Cloudinary link
+      public_id = uploadResult.public_id; // ✅ Cloudinary ID
       file_size = req.file.size;
 
       // Remove temp file
@@ -61,9 +60,10 @@ exports.uploadFile = async (req, res) => {
       file_type,
       file_name,
       file_description,
-      file_path: file_url, // store cloud URL
+      file_path: null, // legacy field, not used
       file_size,
-      cloud_id: public_id, // store Cloudinary public_id
+      cloud_id: public_id,
+      cloudinary_url: file_url, // ✅ store in correct field
     });
 
     console.log('[Upload] Inserted file ID:', id);
@@ -108,10 +108,10 @@ exports.viewFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
     if (!file) return res.status(404).json({ message: 'File not found' });
-    if (!file.file_path) return res.status(400).json({ message: 'This file has no content' });
+    if (!file.cloudinary_url) return res.status(400).json({ message: 'This file has no content' });
 
-    // Just redirect to Cloudinary URL
-    return res.redirect(file.file_path);
+    // ✅ Redirect to Cloudinary URL
+    return res.redirect(file.cloudinary_url);
   } catch (err) {
     console.error('[View Error]', err);
     return res.status(500).json({ message: 'Server error' });
@@ -123,11 +123,10 @@ exports.downloadFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
     if (!file) return res.status(404).json({ message: 'File not found' });
-    if (!file.file_path) return res.status(400).json({ message: 'This file has no content' });
+    if (!file.cloudinary_url) return res.status(400).json({ message: 'This file has no content' });
 
-    // Redirect with Content-Disposition
     res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`);
-    return res.redirect(file.file_path);
+    return res.redirect(file.cloudinary_url); // ✅ Download from Cloudinary
   } catch (err) {
     console.error('[Download Error]', err);
     return res.status(500).json({ message: 'Server error' });
