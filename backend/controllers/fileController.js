@@ -1,6 +1,15 @@
+// controllers/fileController.js
 const FileModel = require('../models/fileModel');
-const path = require('path');
+const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
+const path = require('path');
+
+// 🔹 Cloudinary Config (uses environment variables)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // ======================= UPLOAD FILE =======================
 exports.uploadFile = async (req, res) => {
@@ -9,7 +18,6 @@ exports.uploadFile = async (req, res) => {
     const file_type_raw = req.body.file_type || '';
     const file_name = req.body.file_name;
     const file_description = req.body.file_description || '';
-
     const file_type = file_type_raw.trim().toLowerCase();
 
     // Validate required fields
@@ -22,34 +30,29 @@ exports.uploadFile = async (req, res) => {
     }
 
     console.log('[Upload] Received file:', req.file);
-    console.log('[Upload] Body:', req.body);
 
-    let relPath = null;
-    let absPath = null;
+    let file_url = null;
+    let public_id = null;
     let file_size = null;
 
     if (req.file && file_type !== 'event') {
-      // Determine folder based on file type
-      const subfolder = file_type === 'image'
-        ? 'images'
-        : file_type === 'document'
-        ? 'documents'
-        : 'videos';
+      // 🔹 Upload to Cloudinary
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        folder:
+          file_type === 'image'
+            ? 'brotherscloud/images'
+            : file_type === 'document'
+            ? 'brotherscloud/documents'
+            : 'brotherscloud/videos',
+        resource_type: 'auto', // auto-detect type
+      });
 
-      relPath = path.posix.join('/uploads', subfolder, req.file.filename);
-      absPath = path.join(process.cwd(), 'uploads', subfolder, req.file.filename);
+      file_url = uploadResult.secure_url;
+      public_id = uploadResult.public_id;
+      file_size = req.file.size;
 
-      // Get file size safely
-      try {
-        if (fs.existsSync(absPath)) {
-          const stats = fs.statSync(absPath);
-          file_size = stats.size;
-        } else {
-          console.warn(`[Upload] File not found on disk: ${absPath}`);
-        }
-      } catch (err) {
-        console.warn(`[Upload] Cannot read file size for ${absPath}:`, err.message);
-      }
+      // Remove temp file
+      fs.unlink(req.file.path, () => {});
     }
 
     // Insert into database
@@ -58,18 +61,18 @@ exports.uploadFile = async (req, res) => {
       file_type,
       file_name,
       file_description,
-      file_path: relPath,
-      file_size
+      file_path: file_url, // store cloud URL
+      file_size,
+      cloud_id: public_id, // store Cloudinary public_id
     });
 
     console.log('[Upload] Inserted file ID:', id);
 
-    // Fetch newly created file with size & uploaded_at
     const newFile = await FileModel.getById(id);
 
     return res.status(201).json({
       message: 'File uploaded successfully',
-      file: newFile
+      file: newFile,
     });
   } catch (err) {
     console.error('[Upload Error]', err);
@@ -100,20 +103,15 @@ exports.getFileById = async (req, res) => {
   }
 };
 
-// ======================= VIEW FILE (INLINE PREVIEW) =======================
+// ======================= VIEW FILE =======================
 exports.viewFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
     if (!file) return res.status(404).json({ message: 'File not found' });
-    if (!file.file_path) return res.status(400).json({ message: 'This file type has no stored content' });
+    if (!file.file_path) return res.status(400).json({ message: 'This file has no content' });
 
-    const absPath = path.join(process.cwd(), file.file_path.replace(/^\//, ''));
-    return res.sendFile(absPath, (err) => {
-      if (err) {
-        console.error('[View File Error]', err);
-        if (!res.headersSent) res.status(500).json({ message: 'Error serving file' });
-      }
-    });
+    // Just redirect to Cloudinary URL
+    return res.redirect(file.file_path);
   } catch (err) {
     console.error('[View Error]', err);
     return res.status(500).json({ message: 'Server error' });
@@ -125,15 +123,11 @@ exports.downloadFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
     if (!file) return res.status(404).json({ message: 'File not found' });
-    if (!file.file_path) return res.status(400).json({ message: 'This file type has no stored content' });
+    if (!file.file_path) return res.status(400).json({ message: 'This file has no content' });
 
-    const absPath = path.join(process.cwd(), file.file_path.replace(/^\//, ''));
-    return res.download(absPath, file.file_name, (err) => {
-      if (err) {
-        console.error('[Download File Error]', err);
-        if (!res.headersSent) res.status(500).json({ message: 'Error downloading file' });
-      }
-    });
+    // Redirect with Content-Disposition
+    res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`);
+    return res.redirect(file.file_path);
   } catch (err) {
     console.error('[Download Error]', err);
     return res.status(500).json({ message: 'Server error' });
@@ -143,17 +137,15 @@ exports.downloadFile = async (req, res) => {
 // ======================= DELETE FILE =======================
 exports.deleteFile = async (req, res) => {
   try {
-    const filePath = await FileModel.delete(req.params.id);
-    if (!filePath) return res.status(404).json({ message: 'File not found' });
+    const file = await FileModel.getById(req.params.id);
+    if (!file) return res.status(404).json({ message: 'File not found' });
 
-    if (filePath) {
-      const abs = path.join(process.cwd(), filePath.replace(/^\//, ''));
-      fs.unlink(abs, (fsErr) => {
-        if (fsErr && fsErr.code !== 'ENOENT') {
-          console.warn('[Delete File Error]', fsErr.message);
-        }
-      });
+    // 🔹 Delete from Cloudinary if exists
+    if (file.cloud_id) {
+      await cloudinary.uploader.destroy(file.cloud_id, { resource_type: 'auto' });
     }
+
+    await FileModel.delete(req.params.id);
 
     return res.json({ message: 'File deleted successfully' });
   } catch (err) {

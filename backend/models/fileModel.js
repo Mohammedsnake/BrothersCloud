@@ -1,14 +1,12 @@
-const fs = require('fs');
-const path = require('path');
 const db = require('../config/db');
 
 const FileModel = {
   // ======================= CREATE FILE =======================
-  create: async ({ user_id, file_type, file_name, file_description, file_path, file_size }) => {
+  create: async ({ user_id, file_type, file_name, file_description, file_path, file_size, cloud_id }) => {
     const [result] = await db.query(
-      `INSERT INTO files (user_id, file_type, file_name, file_description, file_path, file_size, uploaded_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [user_id, file_type, file_name, file_description, file_path, file_size || 0]
+      `INSERT INTO files (user_id, file_type, file_name, file_description, file_path, file_size, cloud_id, uploaded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [user_id, file_type, file_name, file_description, file_path, file_size || 0, cloud_id]
     );
     return result.insertId;
   },
@@ -37,28 +35,12 @@ const FileModel = {
 
     const [rows] = await db.query(sql, params);
 
-    // Compute file_size dynamically if missing
-    const filesWithSize = rows.map(file => {
-      let fileSize = file.file_size || 0;
-      if ((!fileSize || fileSize === 0) && file.file_path) {
-        const fileFullPath = path.join(__dirname, '..', file.file_path);
-        try {
-          if (fs.existsSync(fileFullPath)) {
-            fileSize = fs.statSync(fileFullPath).size;
-          }
-        } catch (err) {
-          console.warn(`[FileModel] Cannot read file size for ${fileFullPath}:`, err.message);
-        }
-      }
-
-      return {
-        ...file,
-        file_size: fileSize,
-        uploaded_at: file.uploaded_at ? new Date(file.uploaded_at) : new Date()
-      };
-    });
-
-    return filesWithSize;
+    // Cloudinary already gives us size, so no need to compute from disk
+    return rows.map(file => ({
+      ...file,
+      file_size: file.file_size || 0,
+      uploaded_at: file.uploaded_at ? new Date(file.uploaded_at) : new Date()
+    }));
   },
 
   // ======================= GET FILE BY ID =======================
@@ -70,22 +52,9 @@ const FileModel = {
     if (!rows.length) return null;
 
     const file = rows[0];
-    let fileSize = file.file_size || 0;
-
-    if ((!fileSize || fileSize === 0) && file.file_path) {
-      const fileFullPath = path.join(__dirname, '..', file.file_path);
-      try {
-        if (fs.existsSync(fileFullPath)) {
-          fileSize = fs.statSync(fileFullPath).size;
-        }
-      } catch (err) {
-        console.warn(`[FileModel] Cannot read file size for ${fileFullPath}:`, err.message);
-      }
-    }
-
     return {
       ...file,
-      file_size: fileSize,
+      file_size: file.file_size || 0,
       uploaded_at: file.uploaded_at ? new Date(file.uploaded_at) : new Date()
     };
   },
@@ -93,14 +62,14 @@ const FileModel = {
   // ======================= DELETE FILE =======================
   delete: async (file_id) => {
     const [rows] = await db.query(
-      `SELECT file_path FROM files WHERE file_id = ?`,
+      `SELECT file_path, cloud_id FROM files WHERE file_id = ?`,
       [file_id]
     );
     if (!rows.length) return null;
 
-    const filePath = rows[0].file_path;
+    const fileData = rows[0];
     await db.query(`DELETE FROM files WHERE file_id = ?`, [file_id]);
-    return filePath;
+    return fileData; // return both path + cloud_id
   }
 };
 
