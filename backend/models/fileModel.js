@@ -10,13 +10,24 @@ const FileModel = {
     file_path,       // legacy field (kept for compatibility)
     file_size, 
     cloud_id, 
-    cloudinary_url   // ✅ new field
+    cloudinary_url,   // ✅ new field
+    mime_type         // ✅ NEW
   }) => {
     const [result] = await db.query(
       `INSERT INTO files 
-        (user_id, file_type, file_name, file_description, file_path, file_size, cloud_id, cloudinary_url, uploaded_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [user_id, file_type, file_name, file_description, file_path, file_size || 0, cloud_id, cloudinary_url]
+        (user_id, file_type, file_name, file_description, file_path, file_size, cloud_id, cloudinary_url, mime_type, uploaded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        user_id, 
+        file_type, 
+        file_name, 
+        file_description, 
+        file_path, 
+        file_size || 0, 
+        cloud_id, 
+        cloudinary_url,
+        mime_type || null
+      ]
     );
     return result.insertId;
   },
@@ -49,7 +60,8 @@ const FileModel = {
       ...file,
       file_size: file.file_size || 0,
       uploaded_at: file.uploaded_at ? new Date(file.uploaded_at) : new Date(),
-      cloudinary_url: file.cloudinary_url || null
+      cloudinary_url: file.cloudinary_url || null,
+      mime_type: file.mime_type || null
     }));
   },
 
@@ -66,21 +78,22 @@ const FileModel = {
       ...file,
       file_size: file.file_size || 0,
       uploaded_at: file.uploaded_at ? new Date(file.uploaded_at) : new Date(),
-      cloudinary_url: file.cloudinary_url || null
+      cloudinary_url: file.cloudinary_url || null,
+      mime_type: file.mime_type || null
     };
   },
 
   // ======================= DELETE FILE =======================
   delete: async (file_id) => {
     const [rows] = await db.query(
-      `SELECT file_path, cloud_id, cloudinary_url FROM files WHERE file_id = ?`,
+      `SELECT file_path, cloud_id, cloudinary_url, mime_type FROM files WHERE file_id = ?`,
       [file_id]
     );
     if (!rows.length) return null;
 
     const fileData = rows[0];
     await db.query(`DELETE FROM files WHERE file_id = ?`, [file_id]);
-    return fileData; // ✅ return cloud info for cleanup
+    return fileData; // ✅ return cloud + mime info for cleanup
   }
 };
 
