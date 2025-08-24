@@ -107,7 +107,7 @@ exports.getFileById = async (req, res) => {
   }
 };
 
-// ======================= VIEW FILE =======================
+// ======================= VIEW FILE (Inline if supported) =======================
 exports.viewFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
@@ -116,27 +116,33 @@ exports.viewFile = async (req, res) => {
 
     const mimeType = file.mime_type || mime.lookup(file.file_name) || 'application/octet-stream';
 
-    // ✅ Let browser display inline (image, PDF, video)
-    if (
-      mimeType.startsWith('image/') ||
-      mimeType === 'application/pdf' ||
-      mimeType.startsWith('video/')
-    ) {
+    // ✅ Inline view for images, PDFs, and videos
+    if (mimeType.startsWith('image/')) {
       res.setHeader('Content-Type', mimeType);
       return res.redirect(file.cloudinary_url);
     }
 
-    // ❌ For other docs (Word, Excel etc.), force download
+    if (mimeType === 'application/pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+      return res.redirect(file.cloudinary_url);
+    }
+
+    if (mimeType.startsWith('video/')) {
+      res.setHeader('Content-Type', mimeType);
+      return res.redirect(file.cloudinary_url);
+    }
+
+    // ❌ Other file types → force download
     res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`);
     return res.redirect(file.cloudinary_url);
-
   } catch (err) {
     console.error('[View Error]', err);
     return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// ======================= DOWNLOAD FILE =======================
+// ======================= DOWNLOAD FILE (Always download) =======================
 exports.downloadFile = async (req, res) => {
   try {
     const file = await FileModel.getById(req.params.id);
