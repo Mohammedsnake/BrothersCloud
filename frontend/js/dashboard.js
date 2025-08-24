@@ -1,36 +1,57 @@
+// public/js/dashboard.js
 const API_BASE = "https://brotherscloud-1.onrender.com/api";
 
 /* ===========================
    Utility Functions
 =========================== */
 const utils = {
-  showToast: (message, type = 'success') => {
-    const toast = document.createElement('div');
+  showToast: (message, type = "success") => {
+    const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
 
     setTimeout(() => {
-      toast.classList.add('show');
+      toast.classList.add("show");
       setTimeout(() => {
-        toast.classList.remove('show');
+        toast.classList.remove("show");
         setTimeout(() => toast.remove(), 300);
       }, 3000);
     }, 100);
   },
 
   handleError: (error) => {
-    console.error('Error:', error);
-    utils.showToast(error.message || 'An error occurred', 'error');
+    console.error("Error:", error);
+    utils.showToast(error.message || "An error occurred", "error");
   },
 
   formatDate: (dateString) => {
-    if (!dateString) return 'Unknown Date';
+    if (!dateString) return "Unknown Date";
     const date = new Date(dateString);
-    if (isNaN(date)) return 'Unknown Date';
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString(undefined, options);
-  }
+    return isNaN(date)
+      ? "Unknown Date"
+      : date.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+  },
+
+  showLoader: () => {
+    let loader = document.getElementById("loader");
+    if (!loader) {
+      loader = document.createElement("div");
+      loader.id = "loader";
+      loader.innerHTML = `<div class="spinner"></div>`;
+      document.body.appendChild(loader);
+    }
+    loader.style.display = "flex";
+  },
+
+  hideLoader: () => {
+    const loader = document.getElementById("loader");
+    if (loader) loader.style.display = "none";
+  },
 };
 
 /* ===========================
@@ -66,17 +87,24 @@ class Dashboard {
       searchInput: document.getElementById("searchInput"),
       uploadBtn: document.getElementById("uploadBtn"),
       userName: document.getElementById("userName"),
-      logoutBtn: document.getElementById("logoutBtn")
+      logoutBtn: document.getElementById("logoutBtn"),
     };
   }
 
   setupEventListeners() {
-    this.elements.menuButtons.forEach(btn =>
+    this.elements.menuButtons.forEach((btn) =>
       btn.addEventListener("click", () => this.handleMenuClick(btn))
     );
 
-    this.elements.searchInput.addEventListener("input", () => this.handleSearch());
-    this.elements.uploadBtn.addEventListener("click", () => window.location.href = "upload.html");
+    this.elements.searchInput.addEventListener("input", () =>
+      this.handleSearch()
+    );
+
+    this.elements.uploadBtn.addEventListener(
+      "click",
+      () => (window.location.href = "upload.html")
+    );
+
     this.elements.logoutBtn.addEventListener("click", this.logout);
   }
 
@@ -88,19 +116,23 @@ class Dashboard {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "index.html";
-  }
+  };
 
   async loadData(type) {
     try {
-      const url = type === "calendar"
-        ? `${API_BASE}/events?user_id=${this.user.user_id}`
-        : `${API_BASE}/files?file_type=${type.slice(0, -1)}`;
+      utils.showLoader(); // Show spinner
+      const url =
+        type === "calendar"
+          ? `${API_BASE}/events?user_id=${this.user.user_id}`
+          : `${API_BASE}/files?file_type=${type.slice(0, -1)}`;
 
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.token}` }
+        headers: { Authorization: `Bearer ${this.token}` },
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       this.allData = await response.json();
 
@@ -111,7 +143,6 @@ class Dashboard {
       }
 
       this.renderContent(this.allData, type);
-
     } catch (error) {
       utils.handleError(error);
       this.elements.content.innerHTML = `
@@ -120,6 +151,8 @@ class Dashboard {
           <p>Failed to load data. Please try again later.</p>
         </div>
       `;
+    } finally {
+      utils.hideLoader(); // Hide spinner
     }
   }
 
@@ -134,25 +167,42 @@ class Dashboard {
       return;
     }
 
-    const html = type === "calendar" ? this.renderEvents(data) : this.renderFiles(data, type);
-    this.elements.content.innerHTML = html;
+    this.elements.content.innerHTML =
+      type === "calendar"
+        ? this.renderEvents(data)
+        : this.renderFiles(data, type);
 
     if (type !== "calendar") this.setupFileInteractions();
   }
 
+  /* ===========================
+     Calendar
+  =========================== */
   renderEvents(events) {
     return `
       <ul class="event-list">
-        ${events.map(event => `
+        ${events
+          .map(
+            (event) => `
           <li>
             <div class="event-date">${utils.formatDate(event.event_date)}</div>
             <div class="event-content">
               <h3 class="event-title">${event.event_name}</h3>
-              ${event.event_description ? `<p class="event-description">${event.event_description}</p>` : ''}
-              ${event.repetition === 'yearly' ? '<span class="event-recurring">Recurring</span>' : ''}
+              ${
+                event.event_description
+                  ? `<p class="event-description">${event.event_description}</p>`
+                  : ""
+              }
+              ${
+                event.repetition === "yearly"
+                  ? '<span class="event-recurring">Recurring</span>'
+                  : ""
+              }
             </div>
           </li>
-        `).join('')}
+        `
+          )
+          .join("")}
       </ul>
     `;
   }
@@ -160,27 +210,31 @@ class Dashboard {
   setupEventNotifications() {
     if (!("Notification" in window)) return;
 
-    Notification.requestPermission().then(permission => {
+    Notification.requestPermission().then((permission) => {
       if (permission !== "granted") return;
 
       const checkNotifications = () => {
         const now = new Date();
-        this.events.forEach(async ev => {
+        this.events.forEach(async (ev) => {
           const eventDate = new Date(ev.event_date);
-          const diffDays = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
+          const diffDays = Math.ceil(
+            (eventDate - now) / (1000 * 60 * 60 * 24)
+          );
 
           if (diffDays === 3 && !ev.notified_before) {
             new Notification(`Upcoming Event: ${ev.event_name}`, {
-              body: `Event in 3 days: ${ev.event_description || 'No description'}`
+              body: `Event in 3 days: ${ev.event_description || "No description"}`,
             });
 
             try {
               await fetch(`${API_BASE}/events/${ev.id}/notify-before`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${this.token}` }
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${this.token}` },
               });
               ev.notified_before = true;
-            } catch(err) { console.error('Notify-before patch error:', err); }
+            } catch (err) {
+              console.error("Notify-before patch error:", err);
+            }
           }
         });
       };
@@ -193,15 +247,15 @@ class Dashboard {
   checkTodayEvents() {
     if (!("Notification" in window)) return;
 
-    Notification.requestPermission().then(permission => {
+    Notification.requestPermission().then((permission) => {
       if (permission !== "granted") return;
 
       const now = new Date();
-      this.events.forEach(ev => {
+      this.events.forEach((ev) => {
         const eventDate = new Date(ev.event_date);
         if (eventDate.toDateString() === now.toDateString() && !ev.notified_today) {
           new Notification(`Today's Event: ${ev.event_name}`, {
-            body: ev.event_description || 'No description'
+            body: ev.event_description || "No description",
           });
           ev.notified_today = true;
         }
@@ -209,114 +263,174 @@ class Dashboard {
     });
   }
 
+  /* ===========================
+     Files
+  =========================== */
   renderFiles(files, type) {
     return `
       <div class="file-grid">
-        ${files.map(file => {
-          const filePath = `https://brotherscloud-1.onrender.com${file.file_path}`;
-          const ext = (file.file_name || 'unknown').split('.').pop().toLowerCase();
-          let normalizedType = (file.file_type || 'document').toLowerCase();
+        ${files
+          .map((file) => {
+            const viewUrl = file.view_url || file.cloudinary_url || "#";
+            const downloadUrl = file.download_url || this.makeAttachmentUrl(viewUrl, file.file_name);
 
-          let previewContent = '';
-          if (normalizedType === 'image') previewContent = `<img src="${filePath}" alt="${file.file_name}" loading="lazy">`;
-          else if (normalizedType === 'video') previewContent = `<video src="${filePath}" controls muted></video>`;
-          else {
-            previewContent = `<div class="file-icon ${this.getDocumentIconClass(ext)}"></div>`;
-            normalizedType = 'document';
-          }
+            const ext = (file.file_name || "unknown").split(".").pop().toLowerCase();
+            let normalizedType = (file.file_type || "document").toLowerCase();
 
-          return `
-            <div class="file-card" data-path="${filePath}" data-type="${normalizedType}">
-              <div class="file-preview">${previewContent}</div>
-              <div class="file-info">
-                <div class="file-name" title="${file.file_name}">${file.file_name}</div>
-                <div class="file-meta">
-                  <span class="file-size">${this.formatFileSize(file.file_size)}</span>
-                  <span class="file-date">${file.uploaded_at ? utils.formatDate(file.uploaded_at) : ''}</span>
-                </div>
-                <div class="file-actions">
-                  <button class="btn-download" data-path="${filePath}"><i class="icon-download"></i></button>
-                  <button class="btn-share" data-path="${filePath}" data-name="${file.file_name}"><i class="icon-share"></i></button>
+            let previewContent = "";
+            if (normalizedType === "image") {
+              previewContent = `<img src="${viewUrl}" alt="${file.file_name}" loading="lazy">`;
+            } else if (normalizedType === "video") {
+              previewContent = `<video src="${viewUrl}" controls muted></video>`;
+            } else if (ext === "pdf") {
+              previewContent = `<div class="file-icon pdf"></div>`;
+            } else {
+              previewContent = `<div class="file-icon ${this.getDocumentIconClass(ext)}"></div>`;
+            }
+
+            return `
+              <div class="file-card"
+                   data-view="${viewUrl}"
+                   data-download="${downloadUrl}"
+                   data-type="${normalizedType}"
+                   data-ext="${ext}"
+                   data-name="${file.file_name}">
+                <div class="file-preview">${previewContent}</div>
+                <div class="file-info">
+                  <div class="file-name" title="${file.file_name}">${file.file_name}</div>
+                  <div class="file-meta">
+                    <span class="file-size">${this.formatFileSize(file.file_size)}</span>
+                    <span class="file-date">${file.uploaded_at ? utils.formatDate(file.uploaded_at) : ""}</span>
+                  </div>
+                  <div class="file-actions">
+                    <button class="btn-download" data-url="${downloadUrl}">
+                      <i class="icon-download"></i>
+                    </button>
+                    <button class="btn-share" data-url="${viewUrl}" data-name="${file.file_name}">
+                      <i class="icon-share"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          `;
-        }).join('')}
+            `;
+          })
+          .join("")}
       </div>
     `;
   }
 
+  makeAttachmentUrl(viewUrl, fileName = "file") {
+    try {
+      const url = new URL(viewUrl);
+      const parts = url.pathname.split('/');
+      const uploadIdx = parts.findIndex((p) => p === 'upload');
+      if (uploadIdx !== -1) {
+        const safe = fileName.replace(/[^\w.\-()\s]/g, '_') || 'file';
+        parts.splice(uploadIdx + 1, 0, `fl_attachment:${safe}`);
+        url.pathname = parts.join('/');
+        return url.toString();
+      }
+    } catch (_) {}
+    return viewUrl;
+  }
+
   getDocumentIconClass(ext) {
-    const iconMap = { pdf: 'pdf', doc: 'word', docx: 'word', xls: 'excel', xlsx: 'excel', ppt: 'powerpoint', pptx: 'powerpoint', txt: 'text' };
-    return iconMap[ext] || 'file';
+    const iconMap = {
+      pdf: "pdf",
+      doc: "word",
+      docx: "word",
+      xls: "excel",
+      xlsx: "excel",
+      ppt: "powerpoint",
+      pptx: "powerpoint",
+      txt: "text",
+    };
+    return iconMap[ext] || "file";
   }
 
   formatFileSize(bytes) {
-    if (!bytes || isNaN(bytes)) return '0 Bytes';
+    if (!bytes || isNaN(bytes)) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
   setupFileInteractions() {
-    document.querySelectorAll('.file-card').forEach(card => {
-      card.addEventListener('click', e => {
-        if (!e.target.closest('.file-actions')) {
-          const type = card.dataset.type;
-          const name = card.querySelector('.file-name').textContent;
-          this.openModal(card.dataset.path, type, name);
+    document.querySelectorAll(".file-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (!e.target.closest(".file-actions")) {
+          this.openModal(
+            card.dataset.view,
+            card.dataset.download,
+            card.dataset.type,
+            card.dataset.name,
+            card.dataset.ext
+          );
         }
       });
     });
 
-    document.querySelectorAll('.btn-download').forEach(btn => {
-      btn.addEventListener('click', e => {
+    document.querySelectorAll(".btn-download").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        this.downloadFile(btn.dataset.path);
+        this.downloadFile(btn.dataset.url);
       });
     });
 
-    document.querySelectorAll('.btn-share').forEach(btn => {
-      btn.addEventListener('click', e => {
+    document.querySelectorAll(".btn-share").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        this.shareFile(btn.dataset.path, btn.dataset.name);
+        this.shareFile(btn.dataset.url, btn.dataset.name);
       });
     });
   }
 
   downloadFile(url) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = url.split('/').pop();
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    utils.showToast('Download started');
+    window.open(url, "_blank");
+    utils.showToast("Download started");
   }
 
   async shareFile(url, name) {
     try {
-      if (navigator.share) await navigator.share({ title: name, url });
-      else {
+      if (navigator.share) {
+        await navigator.share({ title: name, url });
+      } else {
         await navigator.clipboard.writeText(url);
-        utils.showToast('Link copied to clipboard');
+        utils.showToast("Link copied to clipboard");
       }
     } catch (err) {
-      if (err.name !== 'AbortError') utils.handleError(err);
+      if (err.name !== "AbortError") utils.handleError(err);
     }
   }
 
-  openModal(url, type, name = '') {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
+  openModal(viewUrl, downloadUrl, type, name = "", ext = "") {
+    const modal = document.createElement("div");
+    modal.className = "modal";
 
-    const ext = name.split('.').pop().toLowerCase();
-    let bodyContent = '';
-    if (type === 'image') bodyContent = `<img src="${url}" alt="${name}">`;
-    else if (type === 'video') bodyContent = `<video src="${url}" controls autoplay></video>`;
-    else if (ext === 'pdf') bodyContent = `<iframe src="${url}" frameborder="0"></iframe>`;
-    else bodyContent = `<div class="file-icon ${this.getDocumentIconClass(ext)}"></div><p>Cannot preview this file. Click Download to open.</p>`;
+    let bodyContent = "";
+
+    if (type === "image") {
+      bodyContent = `<img src="${viewUrl}" alt="${name}">`;
+    } else if (type === "video") {
+      bodyContent = `<video src="${viewUrl}" controls autoplay></video>`;
+    } else if (["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext)) {
+      const gview = `https://docs.google.com/gview?url=${encodeURIComponent(viewUrl)}&embedded=true`;
+      bodyContent = `
+        <div class="gdoc-viewer-wrapper">
+          <iframe src="${gview}" width="100%" height="600px" style="border:none;"></iframe>
+          <div class="viewer-download">
+            <a href="${downloadUrl}" target="_blank" class="btn btn-download">
+              <i class="icon-download"></i> Download
+            </a>
+          </div>
+        </div>
+      `;
+    } else {
+      bodyContent = `
+        <div class="file-icon ${this.getDocumentIconClass(ext)}"></div>
+        <p>Cannot preview this file. Click Download to open.</p>`;
+    }
 
     modal.innerHTML = `
       <div class="modal-content">
@@ -332,23 +446,29 @@ class Dashboard {
       </div>
     `;
 
-    modal.querySelector('.btn-close').addEventListener('click', () => modal.remove());
-    modal.querySelector('.btn-download').addEventListener('click', () => this.downloadFile(url));
-    modal.querySelector('.btn-share').addEventListener('click', () => this.shareFile(url, name));
+    modal.querySelector(".btn-close").addEventListener("click", () => modal.remove());
+    modal.querySelector(".btn-download").addEventListener("click", () => this.downloadFile(downloadUrl));
+    modal.querySelector(".btn-share").addEventListener("click", () => this.shareFile(viewUrl, name));
 
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.addEventListener('keydown', function escListener(e) {
-      if (e.key === 'Escape') {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.remove();
+    });
+
+    document.addEventListener("keydown", function escListener(e) {
+      if (e.key === "Escape") {
         modal.remove();
-        document.removeEventListener('keydown', escListener);
+        document.removeEventListener("keydown", escListener);
       }
     });
 
     document.body.appendChild(modal);
   }
 
+  /* ===========================
+     Navigation + Search
+  =========================== */
   handleMenuClick(btn) {
-    this.elements.menuButtons.forEach(b => b.classList.remove("active"));
+    this.elements.menuButtons.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     this.currentType = btn.dataset.type;
     this.loadData(this.currentType);
@@ -356,10 +476,12 @@ class Dashboard {
 
   handleSearch() {
     const query = this.elements.searchInput.value.toLowerCase();
-    const filtered = this.allData.filter(item => {
+    const filtered = this.allData.filter((item) => {
       if (this.currentType === "calendar") {
-        return item.event_name.toLowerCase().includes(query) ||
-               (item.event_description && item.event_description.toLowerCase().includes(query));
+        return (
+          item.event_name.toLowerCase().includes(query) ||
+          (item.event_description && item.event_description.toLowerCase().includes(query))
+        );
       }
       return item.file_name.toLowerCase().includes(query);
     });
